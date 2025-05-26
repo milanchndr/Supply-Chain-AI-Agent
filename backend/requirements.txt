@@ -1,0 +1,17 @@
+flask==2.3.3
+langchain==0.3.1
+anthropic==0.34.2
+boto3==1.35.24
+faiss-cpu==1.8.0
+numpy==1.26.4
+requests==2.32.3
+psycopg2-binary==2.9.9
+sqlalchemy==2.0.35
+pdfplumber==0.11.4
+langchain_community==0.3.1
+pytesseract==0.3.13
+pymupdf==1.24.10
+Pillow         # For PIL (Image)
+PyMuPDF        # For fitz
+pandas
+python-dotenv  # For .env file support
