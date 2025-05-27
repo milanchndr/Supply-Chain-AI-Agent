@@ -1,197 +1,246 @@
-# Supply-Chain-AI-Agent
+# AI Supply Chain Agent
 
-**Supply-Chain-AI-Agent** is an intelligent assistant designed to streamline supply chain operations by providing quick and accurate answers from both policy documents and structured operational data. This project leverages Large Language Models (LLMs) through a custom Bedrock Lambda interface and a RAG (Retrieval Augmented Generation) pipeline for document querying, alongside direct PostgreSQL database querying for real-time data insights.
+## Project Overview
+
+The AI Supply Chain Agent is a sophisticated backend application designed to provide intelligent insights and perform actions related to supply chain management. It leverages a multi-tool Langchain agent capable of querying structured databases (PostgreSQL via Supabase), searching through unstructured PDF documents (company policies, guidelines), and accessing external information via web search. The agent implements Role-Based Access Control (RBAC) to ensure users only access data and functionalities appropriate for their roles and regions.
+
+The system is built with Flask for the backend API, SQLAlchemy for database interactions, and custom Langchain components interacting with Amazon Bedrock models (via a Lambda proxy) for LLM and embedding capabilities.
 
 ## Features
 
-*   **Dual Query Capability:**
-    *   **Document Intelligence:** Ask questions about company policies, procedures, guidelines, and ethical standards. OCA uses a RAG pipeline with FAISS vector stores and LLMs to find relevant information from PDF documents.
-    *   **Database Insights:** Query structured supply chain data (e.g., inventory levels, order statuses) directly from a PostgreSQL database.
-*   **Flask API Backend:** Exposes a simple and clean API for querying.
-*   **Custom Bedrock Integration:** Utilizes a custom AWS Lambda function to interact with Amazon Bedrock models for LLM and embedding generation, managed via an API key.
-*   **Modular Design:** Separated concerns for data loading, embedding generation, Langchain setup, and API logic.
+*   **Multi-Tool Agent:** Utilizes a Langchain ReAct agent with the following tools:
+    *   **DocumentPolicySearch:** Answers questions based on a corpus of PDF documents using a RetrievalQA chain (FAISS vector store and Bedrock embeddings).
+    *   **SupplyChainDatabaseQuery:** Converts natural language questions into SQL queries to fetch data from a PostgreSQL database, respecting user roles and regions.
+    *   **ExternalWebSearch:** Uses DuckDuckGo to find answers to general knowledge or current event questions.
+*   **Role-Based Access Control (RBAC):**
+    *   User authentication via JWT.
+    *   Application-level role and region checks.
+    *   Database-level Row-Level Security (RLS) to filter data based on user's region and role (requires RLS policies to be set up in Supabase).
+*   **Bedrock Integration (via Lambda):**
+    *   Utilizes Amazon Bedrock's Claude (e.g., Sonnet 3.5) for LLM tasks (SQL generation, agent reasoning).
+    *   Uses Amazon Bedrock's Titan Multimodal Embeddings (e.g., `amazon-embedding-v2`) for document embeddings.
+    *   Interactions with Bedrock are proxied through a configurable AWS Lambda function.
+*   **Document Processing:**
+    *   Extracts text from PDF documents.
+    *   Chunks text and generates embeddings.
+    *   Stores embeddings in a FAISS vector store for efficient similarity search.
+*   **Database Management:**
+    *   Script (`load_db.py`) to initialize the PostgreSQL database, create tables (`supply_chain`, `users`, `audit_logs`), and load sample data from a CSV.
+*   **API Endpoints:**
+    *   `/login`: User authentication.
+    *   `/query`: Main endpoint to interact with the AI agent.
+    *   `/health`: Health check for the application.
+*   **Audit Logging:** Records user queries and agent interactions in an `audit_logs` table.
 
 ## Project Structure
 
 ```
-AI Agent/
-├── backend/                    # Core backend application
-│   ├── app.py                  # Main Flask application
-│   ├── config.py               # Configuration (API keys, DB URL from .env)
-│   ├── embed_documents.py      # Script to process PDFs and create embeddings
-│   ├── documents/              # Source PDF documents & DataCoSupplyChainDataset.csv
-│   │   ├── DataCoSupplyChainDataset.csv
-│   │   └── example_policy.pdf
-│   ├── embeddings/             # Stores FAISS index (generated, gitignored)
-│   ├── utils/                  # Utility modules
+.
+├── backend/
+│   ├── .env                  # Environment variables (GITIGNORED!)
+│   ├── agent_tools.py        # Custom Langchain tools
+│   ├── app.py                # Flask application, API endpoints
+│   ├── config.py             # Application configuration, Bedrock IDs, DATABASE_URL
+│   ├── logger_config.py      # Logging setup
+│   ├── requirements.txt      # Python dependencies
+│   ├── utils/                # Utility modules
 │   │   ├── __init__.py
-│   │   ├── bedrock_utils.py    # Custom Bedrock LLM/Embeddings via Lambda
-│   │   ├── langchain_setup.py  # Langchain RAG pipeline setup
-│   │   └── load_db.py          # Script to load CSV data into PostgreSQL
-│   ├── .env.example            # Example environment file for backend
-│   ├── requirements.txt        # Python dependencies for backend
-│   └── README.md               # Detailed README for the backend component
-├── .gitignore                  # Specifies intentionally untracked files for the whole project
-└── README.md                   # This main project README file
+│   │   ├── agent_handler.py  # Agent creation and prompt logic
+│   │   ├── bedrock_utils.py  # Bedrock LLM and Embedding wrappers (Lambda interaction)
+│   │   ├── db_utils.py       # Database schema introspection
+│   │   ├── embed_documents.py# Script to process PDFs and create embeddings
+│   │   ├── langchain_setup.py# Initializes QA chain and LLM instances
+│   │   ├── load_db.py        # Script to load data into the database
+│   │   └── text_to_sql_utils.py # Text-to-SQL generation logic
+│   ├── documents/            # Store PDF documents here for embedding
+│   │   └── DataCoSupplyChainDataset.csv # Sample CSV for database loading
+│   ├── embeddings/           # Stores FAISS index (GITIGNORED or managed via artifact store)
+│   └── (other_python_files...)
+├── .gitignore
+└── README.md
 ```
 
-## Technology Stack
+## Setup and Installation
 
-*   **Backend:** Python, Flask
-*   **LLM & Embeddings:** Amazon Bedrock (via custom Lambda), Langchain, FAISS
-*   **Database:** PostgreSQL
-*   **Document Processing:** pdfplumber, PyMuPDF (fitz), Pytesseract OCR
-*   **Data Handling:** Pandas, SQLAlchemy
+### Prerequisites
 
-## Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-*   Python (3.9+ recommended)
+*   Python 3.9+
+*   PostgreSQL database (Supabase project recommended)
+*   Access to Amazon Bedrock (or a Lambda function proxying Bedrock)
 *   Git
-*   PostgreSQL (running and accessible)
-*   Tesseract OCR
-    *   Installation: [Tesseract at UB Mannheim](https://github.com/UB-Mannheim/tesseract/wiki)
-    *   Ensure Tesseract is added to your system's PATH, or update the path in `backend/embed_documents.py`.
-*   Access to an AWS Lambda function that interfaces with Amazon Bedrock and an API Key for it.
 
-## Setup Instructions
+### 1. Clone the Repository
 
-1.  **Clone the Repository:**
+```bash
+git clone <your-repository-url>
+cd <your-repository-name>
+```
+
+### 2. Set Up Environment Variables
+
+Navigate to the `backend` directory and create a `.env` file:
+```bash
+cd backend
+cp .env.example .env # If you have an example file, otherwise create .env manually
+```
+Edit the `.env` file with your specific configurations:
+
+```env
+# Bedrock Configuration
+BEDROCK_API_KEY="your_bedrock_or_lambda_api_key"
+LAMBDA_API_URL="your_aws_lambda_url_for_bedrock_proxy"
+# BEDROCK_LLM_MODEL_ID="claude-3.5-sonnet" # Defined in config.py, can be overridden here if needed
+# BEDROCK_EMBEDDING_MODEL_ID="amazon-embedding-v2" # Defined in config.py
+
+# Database Configuration
+SUPABASE_URL="postgresql://user:password@host:port/database" # Your Supabase DB connection string
+DATABASE_URL=${SUPABASE_URL} # Can be the same or a different pooler URL
+
+# JWT Configuration
+JWT_SECRET_KEY="your_super_secret_jwt_key" # Change this to a strong random string
+
+# Optional: Path to CSV for DB loading (relative to backend directory)
+# CSV_PATH_FOR_DB_LOAD="../documents/DataCoSupplyChainDataset.csv" # Default is in config.py
+
+# Optional: Logging Level
+# LOG_LEVEL="INFO" # (DEBUG, INFO, WARNING, ERROR)
+```
+**Important:** Ensure `.env` is listed in your `.gitignore` file to prevent committing secrets.
+
+### 3. Set Up Python Virtual Environment and Install Dependencies
+
+From the `backend` directory:
+
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 4. Set Up Supabase Database
+
+*   Ensure your Supabase project is running and you have the connection string.
+*   **RLS Policies (Crucial for RBAC on Database):**
+    You need to set up Row-Level Security policies on your `supply_chain` table in Supabase. Example policies are discussed in the project and usually involve checking `current_setting('request.jwt.claims.app_metadata.role', true)` and `current_setting('request.jwt.claims.app_metadata.region', true)`.
+    Refer to the [Supabase RLS documentation](https.supabase.com/docs/guides/auth/row-level-security) and the RLS policy examples developed during this project. This typically involves:
+    ```sql
+    -- Enable RLS on the table
+    ALTER TABLE supply_chain ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE supply_chain FORCE ROW LEVEL SECURITY; -- Recommended
+
+    -- Helper functions for RLS (create these in your DB)
+    CREATE OR REPLACE FUNCTION public.get_jwt_claim_role() RETURNS TEXT ... STABLE SECURITY DEFINER;
+    CREATE OR REPLACE FUNCTION public.get_jwt_claim_region() RETURNS TEXT ... STABLE SECURITY DEFINER;
+    GRANT EXECUTE ON FUNCTION public.get_jwt_claim_role() TO authenticated;
+    GRANT EXECUTE ON FUNCTION public.get_jwt_claim_region() TO authenticated;
+
+
+    -- Example RLS Policy
+    CREATE POLICY "User region-based access on supply_chain"
+    ON supply_chain FOR SELECT USING (
+        (public.get_jwt_claim_role() = LOWER('Global Operations Manager')) OR
+        (LOWER(order_country) = public.get_jwt_claim_region())
+    );
+    ```
+    *Ensure the helper functions and the policy are correctly implemented in your Supabase SQL editor.*
+*   **Indexes:** Create necessary indexes for performance. Some are created by `load_db.py`, but you can add more via the SQL editor.
+    ```sql
+    CREATE INDEX IF NOT EXISTS idx_supply_chain_lower_order_country ON supply_chain (LOWER(order_country));
+    -- Add other relevant indexes on frequently queried columns
+    ```
+
+### 5. Load Initial Data and Create Users
+
+From the `backend/utils` directory (or adjust path if running from `backend`):
+```bash
+# Make sure your virtual environment is active
+# Navigate to the directory containing load_db.py if not already in backend/utils/
+# cd backend/utils  (if load_db.py is there)
+# python load_db.py
+
+# Or if load_db.py is in backend/ and you run from project root:
+# python backend/load_db.py
+```
+This script will:
+*   Create the `supply_chain`, `users`, and `audit_logs` tables.
+*   Load data from `DataCoSupplyChainDataset.csv` into `supply_chain`.
+*   Create a sample user (e.g., `planner_india` / `mypassword`). You can add more users directly in your Supabase `users` table or modify the script.
+
+### 6. Generate Document Embeddings
+
+Place your PDF documents into the `backend/documents/` folder.
+Then, run the embedding script from the `backend/utils` directory (or adjust path):
+```bash
+# Make sure your virtual environment is active
+# Navigate to the directory containing embed_documents.py
+# cd backend/utils
+# python embed_documents.py
+
+# Or if embed_documents.py is in backend/ and you run from project root:
+# python backend/embed_documents.py
+```
+This will create a `backend/embeddings/` folder containing the FAISS index. Ensure this path aligns with what `langchain_setup.py` expects.
+
+## Running the Application
+
+From the `backend` directory (ensure your virtual environment is active):
+
+```bash
+flask run --host=0.0.0.0 --port=5000
+# Or, if app.py has app.run(debug=True...):
+# python app.py
+```
+The application will be available at `http://localhost:5000`.
+
+## API Endpoints
+
+*   **`POST /login`**:
+    *   Authenticates a user.
+    *   Request Body: `{"username": "your_username", "password": "your_password"}`
+    *   Response: `{"access_token": "your_jwt_token"}`
+*   **`POST /query`**:
+    *   Sends a question to the AI agent.
+    *   Headers: `Authorization: Bearer <your_jwt_token>`
+    *   Request Body: `{"question": "Your natural language question here"}`
+    *   Response: `{"answer": "Agent's answer", "type": "agent_multi_tool"}`
+*   **`GET /health`**:
+    *   Checks the health and initialization status of backend components.
+
+## Usage Example (e.g., using curl or Postman)
+
+1.  **Login:**
     ```bash
-    git clone https://github.com/YOUR_USERNAME/YOUR_REPOSITORY_NAME.git
-    cd YOUR_REPOSITORY_NAME # e.g., cd OmniChain-AI-Agent
+    curl -X POST http://localhost:5000/login \
+    -H "Content-Type: application/json" \
+    -d '{"username": "planner_india", "password": "mypassword"}'
     ```
+    *(Save the returned `access_token`)*
 
-2.  **Navigate to the Backend Directory:**
+2.  **Query the Agent:**
     ```bash
-    cd backend
+    curl -X POST http://localhost:5000/query \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer <PASTE_YOUR_ACCESS_TOKEN_HERE>" \
+    -d '{"question": "What is the average sales per customer in India?"}'
     ```
 
-3.  **Create and Activate a Python Virtual Environment:**
-    ```bash
-    python -m venv venv
-    # On Windows
-    venv\Scripts\activate
-    # On macOS/Linux
-    source venv/bin/activate
-    ```
+## Key Configuration Points
 
-4.  **Install Dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-5.  **Configure PostgreSQL:**
-    *   Ensure your PostgreSQL server is running.
-    *   Create a database (e.g., `hackathon_db`).
-    *   Note your database user, password, host, and port.
-
-6.  **Set Up Environment Variables:**
-    *   In the `backend/` directory, copy `.env.example` to a new file named `.env`:
-        ```bash
-        cp .env.example .env
-        ```
-    *   Edit `backend/.env` with your actual credentials and API key:
-        ```
-        BEDROCK_API_KEY="your_bedrock_lambda_api_key_here"
-        BEDROCK_LLM_MODEL_ID="claude-3.5-sonnet" # Or your preferred LLM for the Lambda
-        BEDROCK_EMBEDDING_MODEL_ID="amazon.titan-embed-text-v1" # Or your preferred embedding model for the Lambda
-
-        DB_USER="your_db_user"
-        DB_PASSWORD="your_db_password"
-        DB_HOST="localhost"
-        DB_PORT="5432"
-        DB_NAME="hackathon_db"
-        ```
-
-7.  **Prepare Data and Documents:**
-    *   Place your PDF policy documents into the `backend/documents/` folder.
-    *   Ensure the `DataCoSupplyChainDataset.csv` file is present in the `backend/documents/` folder. (If this file is very large and not committed, provide download instructions here).
-
-## Data Loading and Embedding Generation
-
-Execute these scripts from the `backend/` directory (while your virtual environment is active).
-
-1.  **Load CSV Data into PostgreSQL:**
-    This script will create/replace the `supply_chain` table in your database.
-    ```bash
-    python utils/load_db.py
-    ```
-
-2.  **Generate Document Embeddings:**
-    This script will process PDFs in `backend/documents/`, generate embeddings, and save them to the `backend/embeddings/` folder. This can take some time depending on the number and size of your documents.
-    ```bash
-    python embed_documents.py
-    ```
-
-## Running the Backend Application
-
-Once setup, data loading, and embedding generation are complete:
-
-1.  Ensure you are in the `backend/` directory and your virtual environment is active.
-2.  Start the Flask application:
-    ```bash
-    python app.py
-    ```
-    The API server will start, typically on `http://localhost:5000`. You will see logs in the console, including initialization messages for the database and QA chain (either at startup or on the first query, depending on lazy loading).
-
-## API Usage
-
-The primary endpoint for interacting with the agent is `/query`.
-
-*   **Endpoint:** `POST /query`
-*   **URL:** `http://localhost:5000/query`
-*   **Headers:** `Content-Type: application/json`
-*   **Body (JSON):**
-    ```json
-    {
-        "question": "Your question about documents or database information?"
-    }
-    ```
-
-**Example Requests (using a tool like Postman or curl):**
-
-1.  **Document Query:**
-    ```json
-    {
-        "question": "What is the company policy on ethical sourcing?"
-    }
-    ```
-    *Expected Response Type: `document`*
-
-2.  **Database Query (heuristic-based):**
-    (The current implementation uses a simple heuristic and a fixed SQL query for non-document questions. This query targets a specific region, e.g., "West of USA", for inventory sum.)
-    ```json
-    {
-        "question": "What is the total inventory for West of USA?"
-    }
-    ```
-    *Expected Response Type: `database`*
-
-*   **Status Check:**
-    *   **Endpoint:** `GET /`
-    *   **URL:** `http://localhost:5000/`
-    *   Provides a JSON response with the status of backend components.
+*   **`backend/config.py`**: Defines Bedrock model IDs, role permissions (`ROLES_PERMISSIONS`), and default paths.
+*   **`backend/.env`**: Stores all secrets and environment-specific URLs.
+*   **RLS Policies in Supabase**: Essential for database security and multi-tenancy/regional access.
+*   **Lambda Proxy for Bedrock**: The `LAMBDA_API_URL` must point to a working Lambda function that can invoke Bedrock models using the provided `BEDROCK_API_KEY`.
 
 ## Troubleshooting
 
-*   **`ModuleNotFoundError`:** Ensure your virtual environment is active and all dependencies in `requirements.txt` are installed. If running scripts directly, ensure your Python path is set up correctly or that scripts handle relative imports appropriately (as done in `utils/load_db.py`).
-*   **Database Connection Errors:** Verify `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_NAME` in `backend/.env` are correct and your PostgreSQL server is running and accessible.
-*   **`UndefinedColumn` SQL errors:** The column names used in SQL queries within `app.py` must exactly match the cleaned column names generated by `utils/load_db.py`. Check the console output of `load_db.py` for `New columns: [...]`.
-*   **Bedrock/Lambda Errors (e.g., 401 Unauthorized, timeouts, KeyError):**
-    *   Ensure `BEDROCK_API_KEY` is correct in `backend/.env`.
-    *   Verify your Lambda function is deployed, healthy, and configured correctly for the specified Bedrock models.
-    *   Check Lambda logs in AWS CloudWatch.
-    *   If `KeyError` occurs in `bedrock_utils.py` when parsing Lambda responses, the JSON structure returned by your Lambda does not match what the utility expects. You'll need to debug by printing the raw Lambda response in `bedrock_utils.py` and adjusting the parsing logic.
-*   **Embedding Errors:** Ensure `embed_documents.py` ran successfully and created `index.faiss` and `index.pkl` in `backend/embeddings/`. Check Tesseract OCR installation.
-
-## Future Enhancements
-
-*   **Natural Language to SQL (NL2SQL):** Implement a more sophisticated mechanism to convert natural language database queries into SQL.
-*   **Advanced Heuristics/Classifier:** Improve the `is_document_query` function or replace it with a more robust query classification model.
-*   **User Authentication & Authorization.**
-*   **Support for More Document Types.**
-*   **Streaming Responses** for long LLM generations.
-*   **Frontend Interface.**
-*   **Containerization** with Docker.
+*   **"Function does not exist" errors (PostgreSQL):** Ensure helper functions for RLS (`get_jwt_claim_role`, `get_jwt_claim_region`) are created in the correct schema (usually `public`) and that the `authenticated` role (or other relevant roles) have `EXECUTE` permissions on them. RLS policies should use schema-qualified function names (e.g., `public.get_jwt_claim_role()`).
+*   **RLS Not Filtering Data:**
+    *   Verify RLS is enabled on the table (`ALTER TABLE ... ENABLE ROW LEVEL SECURITY;`).
+    *   Consider `ALTER TABLE ... FORCE ROW LEVEL SECURITY;`.
+    *   Double-check the logic in your RLS policy and the values returned by helper functions within a simulated user session.
+    *   Ensure data consistency between `users.region` and `supply_chain.order_country` (or a similar column).
+*   **Timeouts ("Gateway Timeout", "Upstream Timeout"):**
+    *   Often due to RLS policies being inefficient on large tables. Optimize RLS using `STABLE` helper functions and appropriate indexes (e.g., on `LOWER(order_country)`).
+    *   Consider increasing statement timeouts in Supabase connection pooler settings for debugging, but aim to optimize queries/RLS for production.
+*   **`current_setting('request.jwt.claims...', true)` returning NULL:** This was a major debug point. Ensure the JWT is correctly set in the session *before* RLS policies try to read it. The order of `SET ROLE` and `set_config` in your application's database interaction matters. Using explicit JSONB functions (`::jsonb -> 'path' ->> 'key'`) in RLS policies on `current_setting('request.jwt.claims', true)` is more robust than relying on `current_setting('request.jwt.claims.path.key', true)`.
+*   **Embedding Failures:** Check `BEDROCK_EMBEDDING_MODEL_ID`, `LAMBDA_API_URL`, and `BEDROCK_API_KEY`. Ensure PDF documents are in the `backend/documents` folder.
