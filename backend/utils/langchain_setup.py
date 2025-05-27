@@ -1,12 +1,8 @@
-# backend/utils/langchain_setup.py
-import os
 
+import os
 from langchain.chains import RetrievalQA
 from langchain_community.vectorstores import FAISS
-
-# Adjust path for direct execution vs. import from app.py
 import sys
-# This adds the 'backend' directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from config import (
@@ -33,7 +29,7 @@ def setup_qa_chain():
         model_id=BEDROCK_LLM_MODEL_ID,
         api_key=BEDROCK_API_KEY,
         llm_lambda_url=BEDROCK_LLM_LAMBDA_URL,
-        model_kwargs={"temperature": 0.5, "max_tokens": 2000} # Example kwargs
+        model_kwargs={"temperature": 0.5, "max_tokens": 2000} 
     )
     llm = BedrockLLM(config=bedrock_config)
     logger.info(f"BedrockLLM initialized with model: {BEDROCK_LLM_MODEL_ID}")
@@ -50,14 +46,9 @@ def setup_qa_chain():
         embedding_lambda_url=BEDROCK_EMBEDDING_LAMBDA_URL
     )
     logger.info(f"AmazonEmbeddings initialized with model: {BEDROCK_EMBEDDING_MODEL_ID}")
+    here = os.path.dirname(__file__)
+    embeddings_base_path = os.path.abspath(os.path.join(here, "..", "embeddings"))
 
-    # Resolve the embeddings folder relative to this file's parent (backend dir)
-    here = os.path.dirname(__file__) # .../backend/utils
-    embeddings_base_path = os.path.abspath(os.path.join(here, "..", "embeddings")) # .../backend/embeddings
-
-    # FAISS expects "index.faiss" and "index.pkl" in the folder.
-    # Our embed_documents.py saves it this way using FAISS.save_local()
-    # with default index_name="index"
 
     if not os.path.isdir(embeddings_base_path):
         error_msg = f"Embeddings directory not found: {embeddings_base_path}"
@@ -76,8 +67,8 @@ def setup_qa_chain():
         vectorstore = FAISS.load_local(
             embeddings_base_path,
             embeddings,
-            allow_dangerous_deserialization=True, # Ensure you trust the source of index.pkl
-            index_name="index" # Default, but explicit
+            allow_dangerous_deserialization=True, 
+            index_name="index" 
         )
         logger.info(f"FAISS vector store loaded successfully from {embeddings_base_path}")
     except Exception as e:
@@ -88,26 +79,20 @@ def setup_qa_chain():
     # --- 3. Build RetrievalQA chain ---
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
-        chain_type="stuff",  # "stuff" is simple, consider "map_reduce" or "refine" for large docs
-        retriever=vectorstore.as_retriever(search_kwargs={"k": 3}), # Retrieve top 3 docs
+        chain_type="stuff",  
+        retriever=vectorstore.as_retriever(search_kwargs={"k": 3}),
         return_source_documents=True
     )
     logger.info("RetrievalQA chain created successfully.")
     return qa_chain
 
 if __name__ == '__main__':
-    # For testing setup_qa_chain directly
-    # Ensure .env is correctly set up in the `backend` directory
-    # and embeddings are generated.
+
     try:
         logger.info("Testing langchain_setup.py...")
         chain = setup_qa_chain()
         if chain:
             logger.info("QA Chain setup successful (test).")
-            # Example query
-            # test_query = "What is the policy on data privacy?"
-            # result = chain.invoke({"query": test_query})
-            # logger.info(f"Test query result: {result}")
         else:
             logger.error("QA Chain setup failed (test).")
     except Exception as e:

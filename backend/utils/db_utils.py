@@ -1,11 +1,9 @@
-# backend/utils/db_utils.py
 from sqlalchemy import create_engine, inspect as sqlalchemy_inspect
 from sqlalchemy.engine import Engine
 
-# If running this file directly for testing, adjust path
 import sys
 import os
-if __name__ == '__main__': # Allow running this file standalone for testing schema utility
+if __name__ == '__main__': 
     sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
 
 from backend.logger_config import logger
@@ -29,7 +27,6 @@ def get_db_schema_string(engine: Engine, table_name: str) -> str:
         for column in columns:
             col_name = column['name']
             col_type = str(column['type'])
-            # Ensure column names with spaces or special characters are quoted for LLM clarity
             schema_parts.append(f'  "{col_name}": {col_type}')
     except Exception as e:
         logger.error(f"Error inspecting columns for table {table_name}: {e}")
@@ -45,7 +42,6 @@ def get_limited_db_schema_string(engine: Engine, relevant_tables: list = None) -
     all_tables = inspector.get_table_names()
     
     if relevant_tables is None:
-        # If no specific tables, pick a few or common ones (e.g. supply_chain)
         relevant_tables = [t for t in ['supply_chain'] if t in all_tables]
         if not relevant_tables and all_tables: # Fallback to first few tables
             relevant_tables = all_tables[:2] 
@@ -61,14 +57,11 @@ def get_limited_db_schema_string(engine: Engine, relevant_tables: list = None) -
 
 
 if __name__ == '__main__':
-    # Example usage (for testing this utility directly)
-    # Ensure your .env file is in the `backend` directory or accessible
-    # and your PostgreSQL server is running with the hackathon_db.
+
     try:
         test_engine = create_engine(DATABASE_URL)
         logger.info(f"Connected to {DATABASE_URL} for schema test.")
         
-        # Test with 'supply_chain' table
         schema_str_single = get_db_schema_string(test_engine, "supply_chain")
         logger.info(f"\nSchema for 'supply_chain':\n{schema_str_single}")
 

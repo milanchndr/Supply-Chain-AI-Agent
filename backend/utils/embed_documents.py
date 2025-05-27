@@ -1,4 +1,3 @@
-# backend/utils/embed_documents.py
 import os
 import sys
 import pdfplumber
@@ -6,7 +5,6 @@ from langchain.docstore.document import Document
 from langchain_community.vectorstores import FAISS
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 
-# Add parent directory (backend) to sys.path to find config, logger_config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.bedrock_utils import AmazonEmbeddings

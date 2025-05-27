@@ -1,4 +1,3 @@
-# backend/utils/bedrock_utils.py
 import requests
 import json
 from pydantic import BaseModel, Field, ConfigDict, field_validator
@@ -8,19 +7,16 @@ from langchain.llms.base import BaseLLM
 from langchain.embeddings.base import Embeddings
 from langchain_core.outputs import Generation, LLMResult
 
-# Assuming logger_config.py is in the parent directory of utils, or backend is in PYTHONPATH
-# If running utils scripts directly, this import might need adjustment or sys.path hack.
-# For app.py, if backend dir is in sys.path, `from logger_config import logger` might work.
-# Safest for now if running app.py from backend directory:
+
 import sys
 import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) # Add 'backend' to path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))) 
 from backend.logger_config import logger
 from backend.config import BEDROCK_LLM_LAMBDA_URL, BEDROCK_EMBEDDING_LAMBDA_URL, BEDROCK_EMBEDDING_MODEL_ID
 
 
 class BedrockLLMConfig(BaseModel):
-    model_config = ConfigDict(protected_namespaces=(), extra='allow') # Allow extra fields for model_kwargs
+    model_config = ConfigDict(protected_namespaces=(), extra='allow') 
     model_id: str = Field(..., description="The Bedrock model ID")
     api_key: str = Field(..., description="The API key for Bedrock authentication")
     llm_lambda_url: str = Field(..., description="Lambda URL for LLM inference")
@@ -60,8 +56,6 @@ class BedrockLLM(BaseLLM):
             resp.raise_for_status()  # Raises HTTPError for bad responses (4XX or 5XX)
             
             response_data = resp.json()
-            # Assuming Lambda response structure: {"response": {"content": [{"text": "..."}]}}
-            # Or {"response": "text_response_directly"} for simpler lambda
             if "response" in response_data:
                 if isinstance(response_data["response"], dict) and "content" in response_data["response"] and \
                    isinstance(response_data["response"]["content"], list) and len(response_data["response"]["content"]) > 0 and \
@@ -116,8 +110,6 @@ class AmazonEmbeddings(Embeddings):
             response.raise_for_status()
             
             response_data = response.json()
-            # Assuming Lambda response structure: {"response": {"embedding": [...]}}
-            # Or directly {"embedding": [...]}
             if "response" in response_data and "embedding" in response_data["response"]:
                 embedding = response_data["response"]["embedding"]
             elif "embedding" in response_data: # Simpler Lambda response
@@ -126,17 +118,13 @@ class AmazonEmbeddings(Embeddings):
                 logger.error(f"Unexpected AmazonEmbeddings Lambda response format: {response_data}")
                 raise ValueError("Unexpected AmazonEmbeddings Lambda response format")
 
-            if not embedding: # Handle empty embedding list if API returns that for some reason
+            if not embedding: 
                 logger.warning(f"Received empty or null embedding for text: '{text[:50]}...'")
-                # Depending on strictness, could return a zero vector of expected dimension or raise error
-                # For now, let's raise, as FAISS needs consistent non-empty vectors.
                 raise ValueError("Received empty embedding from Lambda.")
             return embedding
 
         except requests.exceptions.HTTPError as e:
             logger.error(f"{e.response.status_code} error from AmazonEmbeddings Lambda: {e.response.text}")
-            # Propagate as a generic error or return a special value if downstream can handle it.
-            # Returning None can cause issues with FAISS. Better to raise.
             raise ValueError(f"Embedding Lambda HTTP error: {e.response.status_code} {e.response.text}") from e
         except requests.exceptions.RequestException as e:
             logger.error(f"RequestException calling AmazonEmbeddings Lambda: {e}")
@@ -147,12 +135,8 @@ class AmazonEmbeddings(Embeddings):
 
 
     def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        # Filter out empty texts before sending, as some embedding models error on empty input.
         return [self._get_embedding(text) for text in texts if text and text.strip()]
-
     def embed_query(self, text: str) -> List[float]:
         if not text or not text.strip():
-            # Handle empty query text appropriately, e.g., return a zero vector or raise error.
-            # Raising error is safer for consistency with FAISS.
             raise ValueError("Cannot embed empty query text.")
         return self._get_embedding(text)
