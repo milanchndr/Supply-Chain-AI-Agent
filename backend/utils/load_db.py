@@ -5,7 +5,6 @@ from sqlalchemy import create_engine, text
 import bcrypt
 from time import sleep
 
-# Add parent directory (backend) to sys.path to find config, logger_config
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from backend.config import DATABASE_URL, CSV_PATH_FOR_DB_LOAD
@@ -15,11 +14,9 @@ def load_data_to_db():
     """Load data from CSV into the Supabase PostgreSQL database and set up the users table."""
     logger.info("Starting database loading process...")
 
-    # Retry logic for connecting to Supabase
     max_retries = 3
     for attempt in range(max_retries):
         try:
-            # Create database engine for Supabase with connection pooling options
             engine = create_engine(DATABASE_URL, pool_pre_ping=True, pool_recycle=3600)
             with engine.connect() as connection:
                 logger.info(f"Connected to Supabase database: {DATABASE_URL.split('@')[-1]}")
@@ -32,7 +29,6 @@ def load_data_to_db():
             sleep(2)  # Wait before retrying
 
     try:
-        # Construct the absolute path to the CSV file
         current_dir = os.path.dirname(__file__)  # backend directory
         csv_file_path = os.path.join(current_dir, '..', 'documents', 'DataCoSupplyChainDataset.csv')
         csv_file_path = os.path.abspath(csv_file_path)
@@ -40,11 +36,9 @@ def load_data_to_db():
         logger.info(f"Attempting to load CSV data from: {csv_file_path} with encoding: latin1")
         df = pd.read_csv(csv_file_path, encoding='latin1')
 
-        # Clean column names (SQLAlchemy doesn't like spaces or special characters in column names)
         df.columns = [c.replace(' ', '_').replace('(', '').replace(')', '').lower() for c in df.columns]
         logger.info(f"Cleaned column names: {df.columns.tolist()}")
 
-        # Rename the date column to 'order_date' if it exists under a different name
         possible_date_columns = ['order_date_dateorders', 'orderdate', 'order_date', 'date']
         date_column = None
         for col in possible_date_columns:
@@ -59,11 +53,9 @@ def load_data_to_db():
             logger.error("No order date column found in CSV. Expected one of: " + ", ".join(possible_date_columns))
             return
 
-        # Convert date columns to datetime before loading
         df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce')
         df['shipping_date_dateorders'] = pd.to_datetime(df['shipping_date_dateorders'], errors='coerce')
 
-        # Handle any data type issues
         numeric_columns = ['benefit_per_order', 'sales_per_customer', 'customer_zipcode', 'latitude', 'longitude', 
                           'order_item_discount', 'order_item_discount_rate', 'order_item_product_price', 
                           'order_item_profit_ratio', 'sales', 'order_item_total', 'order_profit_per_order', 
@@ -76,20 +68,15 @@ def load_data_to_db():
         logger.info(f"DataFrame shape: {df.shape}")
         logger.info(f"DataFrame columns: {list(df.columns)}")
 
-        # Create and load data with proper transaction handling
         with engine.connect() as connection:
-            # Start a transaction
             trans = connection.begin()
             try:
-                # Set longer timeout for this session
                 connection.execute(text("SET statement_timeout = '1200s';"))
                 logger.info("Set statement_timeout to 1200 seconds (20 minutes) for this session.")
 
-                # Drop table if exists to avoid conflicts
                 connection.execute(text("DROP TABLE IF EXISTS supply_chain CASCADE"))
                 logger.info("Dropped supply_chain table if it existed.")
 
-                # Create the table manually with proper schema
                 create_table_query = """
                 CREATE TABLE supply_chain (
                     type VARCHAR(20),
@@ -151,7 +138,6 @@ def load_data_to_db():
                 connection.execute(text(create_table_query))
                 logger.info("Created supply_chain table successfully.")
 
-                # Load data in smaller chunks to avoid timeout
                 chunk_size = 1000
                 total_rows = len(df)
                 logger.info(f"Loading {total_rows} rows in chunks of {chunk_size}")
@@ -161,15 +147,11 @@ def load_data_to_db():
                     chunk.to_sql('supply_chain', connection, if_exists='append', index=False, method='multi')
                     logger.info(f"Loaded chunk {i//chunk_size + 1}/{(total_rows-1)//chunk_size + 1} ({len(chunk)} rows)")
 
-                # Create indexes for performance
                 logger.info("Creating initial indexes...")
                 connection.execute(text("CREATE INDEX IF NOT EXISTS idx_supply_chain_order_date ON supply_chain (order_date)"))
                 connection.execute(text("CREATE INDEX IF NOT EXISTS idx_supply_chain_sales ON supply_chain (sales)"))
                 connection.execute(text("CREATE INDEX IF NOT EXISTS idx_supply_chain_customer_id ON supply_chain (customer_id)"))
                 connection.execute(text("CREATE INDEX IF NOT EXISTS idx_supply_chain_order_id ON supply_chain (order_id)"))
-                # Index for RLS (if you keep it)
-                connection.execute(text("CREATE INDEX IF NOT EXISTS idx_supply_chain_lower_order_country ON supply_chain (LOWER(order_country))"))
-                logger.info("Initial indexes created successfully.")
 
                 logger.info("Creating additional performance indexes...")
                 # Financial & Key Metrics
@@ -209,7 +191,7 @@ def load_data_to_db():
         logger.error(f"Failed to load supply chain data: {e}", exc_info=True)
         return
 
-    # Step 3: Create the users table
+
     try:
         with engine.connect() as connection:
             # Drop table if it exists (for idempotency)
@@ -234,7 +216,6 @@ def load_data_to_db():
         logger.error(f"Failed to create users table: {e}", exc_info=True)
         return
 
-    # Step 4: Insert a sample user with a hashed password
     try:
         # Generate a hashed password for the sample user
         password = "mypassword"

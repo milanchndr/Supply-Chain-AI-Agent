@@ -4,15 +4,18 @@ from flask_jwt_extended import JWTManager, jwt_required, get_jwt_identity, creat
 import os
 import bcrypt
 
-
+from flask_cors import CORS 
 from .config import DATABASE_URL, ROLES_PERMISSIONS, JWT_SECRET_KEY
 from .utils.langchain_setup import setup_qa_chain
 from .logger_config import logger
 from .utils.agent_handler import create_supply_chain_agent_executor
 
 app = Flask(__name__)
+# Enable CORS for all routes
+CORS(app, resources={r"/*": {"origins": "http://localhost:8080"}})
 
 # Setup JWT
+
 app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
 jwt = JWTManager(app)
 

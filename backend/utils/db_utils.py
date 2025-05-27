@@ -27,6 +27,7 @@ def get_db_schema_string(engine: Engine, table_name: str) -> str:
         for column in columns:
             col_name = column['name']
             col_type = str(column['type'])
+
             schema_parts.append(f'  "{col_name}": {col_type}')
     except Exception as e:
         logger.error(f"Error inspecting columns for table {table_name}: {e}")

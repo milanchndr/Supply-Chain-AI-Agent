@@ -1,11 +1,15 @@
+
 from langchain.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import ChatPromptTemplate
 from langchain import hub
-from langchain.tools.render import render_text_description # Not strictly used in this version of prompt
+from langchain.tools.render import render_text_description
 
-from ..agent_tools import DocumentQATool, CustomSQLTool # Ensure relative import is correct
+
+from langchain.memory import ConversationBufferWindowMemory 
+
+from ..agent_tools import DocumentQATool, CustomSQLTool
 from ..logger_config import logger
-from langchain_community.tools import DuckDuckGoSearchRun # Using community version
+from langchain_community.tools import DuckDuckGoSearchRun
 
 CUSTOM_REACT_PROMPT_STRING_WITH_TOOLS_AND_NAMES = """Answer the following questions as best you can. You have access to the following tools:
 
@@ -31,6 +35,11 @@ Final Answer: the final answer to the original input question.
 
 Begin!
 
+---
+CHAT HISTORY:
+{chat_history} # <--- ADD THIS LINE FOR CONVERSATION HISTORY
+---
+
 Question: {input}
 Thought:
 {agent_scratchpad}
@@ -42,63 +51,70 @@ User Region: {user_region}
 JWT Claims (for SupplyChainDatabaseQuery only): {jwt_claims_for_db}
 ---
 """
-
 def create_supply_chain_agent_executor(llm_instance, qa_chain_instance, db_engine_instance):
     logger.info("Creating Supply Chain Agent Executor...")
     logger.info("Initializing agent tools...")
 
     doc_tool = DocumentQATool(qa_chain=qa_chain_instance)
     sql_tool = CustomSQLTool(db_engine=db_engine_instance, llm=llm_instance)
-    
-    web_search_tool = DuckDuckGoSearchRun(name="ExternalWebSearch") # Ensure this is how you want to use it
-    web_search_tool.description = ( # Make description clear for the agent
+
+    web_search_tool = DuckDuckGoSearchRun(name="ExternalWebSearch")
+    web_search_tool.description = (
         "Useful for finding current information, news, public data, or general knowledge "
         "from the internet that is not available in internal documents or the supply chain database. "
         "Input should be a concise search query."
     )
-    
+
     tools = [doc_tool, sql_tool, web_search_tool]
     tool_names_list = [tool.name for tool in tools]
     logger.info(f"Tools initialized: {tool_names_list}")
 
     try:
-        prompt_template_hub = hub.pull("hwchase17/react") # Standard ReAct prompt
-        logger.info(f"Successfully pulled prompt 'hwchase17/react'. Input variables: {prompt_template_hub.input_variables}")
-        
-        logger.warning("Pulled 'hwchase17/react' prompt from hub, but will proceed with the custom string prompt for better control over Action Input formatting instructions.")
         prompt = ChatPromptTemplate.from_template(CUSTOM_REACT_PROMPT_STRING_WITH_TOOLS_AND_NAMES)
 
     except Exception as e:
         logger.warning(f"Failed to pull 'hwchase17/react' prompt: {e}. Using custom string prompt as fallback.", exc_info=True)
         prompt = ChatPromptTemplate.from_template(CUSTOM_REACT_PROMPT_STRING_WITH_TOOLS_AND_NAMES)
-        
-    expected_vars = ["tools", "tool_names", "input", "agent_scratchpad", "user_role", "user_region", "jwt_claims_for_db"]
+
+    expected_vars = ["tools", "tool_names", "input", "agent_scratchpad",
+                     "user_role", "user_region", "jwt_claims_for_db",
+                     "chat_history"]
     if not all(v in prompt.input_variables for v in expected_vars):
         logger.error(f"Custom prompt string is missing required variables. Expected: {expected_vars}, Found: {prompt.input_variables}")
         raise ValueError(f"Custom prompt string is missing required variables. Found: {prompt.input_variables}")
     logger.info(f"Using custom prompt. Input variables: {prompt.input_variables}")
 
-
     try:
         agent = create_react_agent(
             llm=llm_instance,
             tools=tools,
-            prompt=prompt # Use the selected prompt (custom in this case)
+            prompt=prompt
         )
         logger.info("ReAct agent created successfully.")
     except Exception as e:
         logger.error(f"Failed to create ReAct agent: {e}", exc_info=True)
         raise
 
+    # --- MODIFIED: Specify input_key for memory ---
+    memory = ConversationBufferWindowMemory(
+        memory_key="chat_history",
+        input_key="input",  # <--- ADD THIS LINE
+        return_messages=True,
+        k=5
+    )
+    logger.info(f"Initialized ConversationBufferWindowMemory with memory_key='chat_history', input_key='input', k={memory.k} turns.")
+
+
     try:
         executor = AgentExecutor(
             agent=agent,
             tools=tools,
-            verbose=True, 
+            verbose=True,
             handle_parsing_errors="I apologize, I encountered an issue processing the previous step. I will try a different approach.",
-            max_iterations=10, 
+            max_iterations=10,
+            memory=memory
         )
-        logger.info("AgentExecutor created successfully.")
+        logger.info("AgentExecutor created successfully with conversational memory.")
         return executor
     except Exception as e:
         logger.error(f"Failed to create AgentExecutor: {e}", exc_info=True)
