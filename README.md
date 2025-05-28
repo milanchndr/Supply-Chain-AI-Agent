@@ -4,6 +4,14 @@
 ## Project Overview
 
 **Live Frontend Deployment:** [https://supply-chain-ai-agent.netlify.app/](https://supply-chain-ai-agent.netlify.app/)
+usernames
+global_manager: Role Global Operations Manager, Region Global
+planner_india: Role Planning, Region India
+planner_china: Role Planning, Region China
+finance_india: Role Finance, Region India
+finance_brasil: Role Finance, Region Brasil
+
+password: mypassword
 
 The AI Supply Chain Agent is a sophisticated backend application designed to provide intelligent insights and perform actions related to supply chain management. It leverages a multi-tool Langchain agent capable of querying structured databases (PostgreSQL, potentially via Supabase or a local instance), searching through unstructured PDF documents (company policies, guidelines), and accessing external information via web search. The agent implements robust Role-Based Access Control (RBAC) combined with geographical data restrictions to ensure users only access data and functionalities appropriate for their roles and specific regions.
 
