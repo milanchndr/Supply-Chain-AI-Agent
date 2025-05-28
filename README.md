@@ -1,4 +1,4 @@
-```markdown
+
 # AI Supply Chain Agent
 
 ## Project Overview
