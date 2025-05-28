@@ -113,7 +113,7 @@ export default {
       loginStatus: '',
       isLoading: false,
       focusedField: null,
-      backendUrl: 'http://localhost:5000',
+      backendUrl: 'https://milanchndr-supply-chain-ai-agent.hf.space',
     };
   },
   computed: {
