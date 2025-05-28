@@ -197,7 +197,7 @@ export default {
   name: 'QueryPage',
   data() {
     return {
-      backendUrl: 'http://localhost:5000',
+      backendUrl: 'https://milanchndr-supply-chain-ai-agent.hf.space',
       question: '',
       conversationHistory: [],
       queryError: '',
