@@ -3,11 +3,11 @@
 
 ## Project Overview
 
+**Live Frontend Deployment:** [https://supply-chain-ai-agent.netlify.app/](https://supply-chain-ai-agent.netlify.app/)
+
 The AI Supply Chain Agent is a sophisticated backend application designed to provide intelligent insights and perform actions related to supply chain management. It leverages a multi-tool Langchain agent capable of querying structured databases (PostgreSQL, potentially via Supabase or a local instance), searching through unstructured PDF documents (company policies, guidelines), and accessing external information via web search. The agent implements robust Role-Based Access Control (RBAC) combined with geographical data restrictions to ensure users only access data and functionalities appropriate for their roles and specific regions.
 
 The system is built with Flask for the backend API, SQLAlchemy for database interactions, and custom Langchain components interacting with Amazon Bedrock models (via a Lambda proxy) for LLM and embedding capabilities. This backend serves a Vue.js frontend application, providing a complete user experience.
-
-**Live Frontend Deployment:** [https://supply-chain-ai-agent.netlify.app/](https://supply-chain-ai-agent.netlify.app/)
 
 ## Features
 
