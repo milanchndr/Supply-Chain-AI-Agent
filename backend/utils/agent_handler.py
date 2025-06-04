@@ -37,7 +37,7 @@ Begin!
 
 ---
 CHAT HISTORY:
-{chat_history} # <--- ADD THIS LINE FOR CONVERSATION HISTORY
+{chat_history}
 ---
 
 Question: {input}
@@ -95,10 +95,10 @@ def create_supply_chain_agent_executor(llm_instance, qa_chain_instance, db_engin
         logger.error(f"Failed to create ReAct agent: {e}", exc_info=True)
         raise
 
-    # --- MODIFIED: Specify input_key for memory ---
+    # input_key for memory ---
     memory = ConversationBufferWindowMemory(
         memory_key="chat_history",
-        input_key="input",  # <--- ADD THIS LINE
+        input_key="input",  
         return_messages=True,
         k=5
     )
