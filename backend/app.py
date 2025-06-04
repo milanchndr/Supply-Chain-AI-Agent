@@ -130,8 +130,8 @@ def login():
             additional_claims = {
                 "role": "authenticated", # Standard Supabase role for authenticated users
                 "app_metadata": {
-                    "role": role_from_db,       # Your application-specific role
-                    "region": region_from_db    # Your application-specific region
+                    "role": role_from_db,       # application-specific role
+                    "region": region_from_db    # application-specific region
                 }
             }
 
